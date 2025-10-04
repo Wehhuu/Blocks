@@ -20,12 +20,11 @@ build: $(SOURCE)
 debug-mode: $(SOURCE)
 	$(CC) $(BUILD_FLAGS) $(DEBUG_FLAGS) $(RENAME_FLAG) $(TARGET_NAME) $(SOURCE)
 
-uninstall:
+uninstall: 
 	sudo rm -f $(BINDIR)/$(TARGET_NAME)
 	sudo rm -f $(TARGET_NAME)
 
 help:
-	@echo -e "No argument detected.\nExecuting 'make help'\n"
 	@echo "install: compiles source code and copies it to $(BINDIR)" 
 	@echo "build: compiles source code."
 	@echo "debug: compiles source code with debug flags."
