@@ -8,8 +8,8 @@
 #include <pthread.h>// Girdiyi başka çekirdekte alacağım. Böylece ana thread bloklanmadan girdi alabileceğim.
 #include <stdbool.h>// Oyun döngüsünü kontrol edecek temel değişkenler için kullanılacak.
 
+//! ünlem ile işaretlenmiş prototip veya metodlar motorun çalışması için kritik öneme sahiptir.
 #pragma region Engine Prototypes
-//* ! ünlem ile işaretlenmiş prototip veya metodlar motorun çalışması için kritik öneme sahiptir.
 void process_start(void);
 void process_frame(void);
 void render(void);
@@ -31,16 +31,21 @@ struct termios original;
 #pragma endregion Engine Variables
 
 
-#pragma region User Definitions
+//? Delta kare ve ekran temizleme motoru da ilgilendirdiği için bu bölüme alındı.
+#pragma region Engine Definitions
+#define CLEAR_SCREEN printf("\e[1;1H\e[2J")// Ekranı temizler.
+#define DELTA_TIME 5000000/60// İki ardışık kare arası zaman. 1 saniyeye bölümü FPS'i verir.
+#pragma endregion Engine Definitons
 
+
+//? Bu makrolar ihtiyaca göre düzenlenebilir, yeniden adlandırılabilir.
+#pragma region User Definitions
 #pragma region Macros
 #define DIRECTIONS "AD"// Sağ için 1, sol için 0
 #define TOTAL_LAYOUTS 5
 #define LAYOUT_SIZE_Y 2
 #define LAYOUT_SIZE_X 3
 #define QUIT_KEY 'Q'// q yerine Q seçmemin nedeni yanlışlıkla çıkılma ihtimalini azaltmaktır.
-#define CLEAR_SCREEN printf("\e[1;1H\e[2J")// Ekranı temizler.
-#define DELTA_TIME 5000000/60// İki ardışık kare arası zaman. 1 saniyeye bölümü FPS'i verir.
 #define GRID_SIZE_X 15// Oyun alanının x eksenindeki boyutu.
 #define GRID_SIZE_Y 30// Oyun alanının y eksenindeki boyutu.
 #pragma endregion Macros
@@ -65,7 +70,7 @@ block_part blocks[GRID_SIZE_Y][GRID_SIZE_X];
 // ızgaradaki adresini tutar. O blok zemine oturunca adreslerine NULL atanır.
 block_part current = {NULL, NULL};
 
-// //?: Blok tipleri.
+//?: Blok tipleri.
 bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] = 
 { 
 //*  Şeklin üstü | Şeklin altı     
@@ -77,7 +82,9 @@ bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
 
 {    {1, 1, 0}  ,  {1, 1, 0} },
 
-{    {0, 1, 0}  ,  {1, 1, 0} }
+{    {0, 1, 0}  ,  {1, 1, 0} }/*,
+
+{    {1, 1, 1}  ,  {0, 0, 0} }*/
 
 };
 #pragma endregion Variables
@@ -85,7 +92,7 @@ bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
 #pragma region User Prototypes
 block_part create_block(void);
 void apply_gravity(void);
-void try_clear(void);
+void clear(void);
 int process_input(void);
 bool check_cell(block_part *cell, int mode);
 void change_pos(int dir);
@@ -228,9 +235,107 @@ void apply_gravity(void)
     }
 }
 
-void try_clear(void)
+void clear(void)
 {
-    // TODO: Satır kontrolü.
+    for (int i = 0; i < GRID_SIZE_Y; i++)
+    {
+        //?: Satır kontrolünden sonra bu değişkene göre satır temizleme yapacağız.
+        bool ready = true;
+        for (int j = 0; j < GRID_SIZE_X; j++)
+        {
+            //?: Bir tane bile boş hane varsa bu satırı atla. Boş yere durmayalım.
+            if (blocks[i][j].main == NULL || blocks[i][j].main == current.main)
+            {
+                j = GRID_SIZE_X;//?: break yerine bunu kullandım bilerek. Zararı yok sonuçta.
+                ready = false;
+            } 
+        }
+
+        if (ready)
+        {
+            // Bu aşamada sürekli satırlar arasında konum değiştireceğimiz için ne zaman satır sonuna geldiğimizi anlayamayız. Bu nedenle bu değişkeni kullanarak satır sonuna geldiğimizi anlayacağız.
+            int pos_in_row = 0;
+            int row = 0;
+
+            while (pos_in_row < GRID_SIZE_X)
+            {
+                block_part storage;
+                storage.main = NULL;
+
+                // Bloğun merkezi daha aşağıda kalıyorsa.
+                if (blocks[i][pos_in_row].main > &blocks[i][pos_in_row])
+                {
+                    // Merkez adres orijinali ile aynı kaldıkça ve şu anki adres ile başlangıç konumu arasında en az bir satır oldukça merkezden yukarı çıkmaya çalış.
+                    for (block_part *diver = blocks[i][pos_in_row].main; diver->next != NULL && diver->main == blocks[i][pos_in_row].main && (diver - &blocks[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next) 
+                    {
+                        storage.main = diver;
+                    }
+
+                    // Şu anda, hedef satırdan önceki son bloğu biliyoruz. Tek yapmamız gereken o bloğun next değerini sıfırlamak.
+                    if (storage.main != NULL)
+                    {
+                        (storage.main)->next = NULL;
+                    }
+
+                    // Şimdi az önceye geri dönüp kalan blokları silebiliriz.
+                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main->main; diver++)// Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
+                    {
+                        row++;
+                        diver->main = NULL;
+                        diver->next = NULL;
+                    }                        
+                }
+
+                // Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz. 
+                // Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan 
+                // erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
+                else if (blocks[i][pos_in_row].main == &blocks[i][pos_in_row])
+                {
+                    bool same_row = true;
+
+                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == blocks[i][pos_in_row].main && diver->next != NULL; diver = diver->next)
+                    {
+                        if (same_row && diver - &blocks[i][pos_in_row] < GRID_SIZE_X)// Aynı satırdalarsa farkları satır uzunluğundan küçük olmak zorunda.
+                        {
+                            same_row = true;
+                        }
+                        else
+                        {
+                            same_row = false;
+                            storage.main = storage.main == NULL ? diver : storage.main;// Aradığımız şey bu satırda olmayan ilk blok. Ve bu tabii ki bu kondisyonun olduğu satırda aranır.
+                        }
+                    }
+                    
+                    if (same_row)
+                    {
+                        for (block_part *diver = &blocks[i][pos_in_row]; diver->main == blocks[i][pos_in_row].main && diver->next != NULL; diver = diver->next)
+                        {
+                            row++;
+                            diver->next = NULL;
+                            diver->main = NULL;
+                        }
+                    }
+                    else
+                    {
+                        for (block_part *diver = storage.main; diver->main == blocks[i][pos_in_row].main && diver != NULL; diver = diver->next)
+                        {
+                            diver->main = storage.main;
+                        }
+
+                        for (block_part *diver = &blocks[i][pos_in_row]; diver != storage.main; diver = diver->next)
+                        {
+                            row++;
+                            diver->next = NULL;
+                            diver->main = NULL;
+                        }
+                    }
+                }
+
+                pos_in_row += row;
+            }
+        }
+    }
+
 }
 int process_input(void)
 {
@@ -446,7 +551,7 @@ void process_frame(void)
         apply_gravity();
 
         //TODO: Uygun satırları temizle.
-        try_clear();  
+        clear();  
     }
 }
 
