@@ -1,20 +1,45 @@
+# Blocks
+
+**Bu depo, tamamiyle C dili kullanarak yazılmış, Tetris benzeri, terminal tabanlı bir oyundur. Oyun, Android (Termux ile) ve Linux dağıtımlarında çalıştırılabilir.**
+
+**Aşağıda, kurulum ve diğer işlemler için bir kılavuz bulacaksınız.**
+
+#### ⚠️ Not: Bu proje aktif olarak geliştirme halindedir. Bu dosyaya yeni şeyler eklenebilir veya olan içerikler değiştilebilir. Projenin kendisinde de hala eksik olan bazı özellikler ileride getirilecektir. 
+
+**⚠️⚠️ÖNEMLİ NOT: Proje bitmediğinden dolayı bazı durumlarda program beklenmedik davranış gösterebilir. Depoyu kullanıyorsanız, bu riski göze almış sayılırsınız.**
+
+#### İlerleme:
+- ✅ Blok hareketi
+- ✅ Yerçekimi
+- ✅ Girdi sistemi
+- ✅ Görüntü işleme
+- ✅ Makefile
+- 🚧 Satır temizleme (`clear` fonksiyonu, şu haliyle beklenmedik davranışlarda bulunuyor)
+- 🚧 Skor sistemi ve harici kayıt dosyası entegrasyonu
+- 🚧 Ana ekran (?)
+- 🚧 Kaybetme ekranı (?)
+- 🚧 Ana menü (?)
+
 # İçerik Tablosu
 
-1. [Kurulum](#1---kurulum)
-    * [Linux Dağıtımlarında Kurulum](#linux-dağıtımlarında-kurulum)
-    * [Android Üstünde Termux ile Kurulum](#android-üstünde-termux-ile-kurulum)
+1. [Kurulum / Kaldırma](#kurulum--kaldırma)
+    * [Kurulum](#kurulum)
+        * [Linux Dağıtımlarında Kurulum](#linux-dağıtımlarında-kurulum)
+        * [Android Üstünde Termux ile Kurulum](#android-üstünde-termux-ile-kurulum)
+    * [Kaldırma](#kaldırma)
 
-2. [Kaldırma](#2---kaldırma)
+2. [Nasıl Oynanır?](#nasıl-oynanır)
 
-3. [Modifikayson ve İleri Okuma](#modifikasyon-ve-i̇leri-okuma)
+3. [Modifikasyon ve İleri Okuma](#modifikasyon-ve-i̇leri-okuma)
+    * [Kontrol Değiştirme](#kontrol-değiştirme)
     * [Şekil Tanımlama](#şekil-tanımlama)
     * 🚧 Bu kısmın devamı gelecektir. 🚧
 
 
-#### ⚠️ Not: Bu proje anlık olarak geliştirme halindedir. Bu dosyaya yeni şeyler eklenebilir veya olan içerikler değiştilebilir. Projenin kendisinde de hala eksik olan bazı özellikler ileride getirilecektir.
-# 1 - Kurulum
+# Kurulum / Kaldırma
 
-Eğer projeyi kurmak istiyorsanız aşağıdaki kod ile depoyu klonlayabilirsiniz.
+## Kurulum 
+Projeyi kurmak için `git`, `make` ve `gcc` programları varsayılan olarak kullanılmaktadır. Eğer `gcc` kullanmak istemiyorsanız ya da `make` kullanmak istemiyorsanız bunu kesinlikle yapabilirsiniz, sadece `Makefile` dosyasında derleme için zorunlu olan flaglare (`BUILD_FLAGS`) bakın ve manuel derlemede bunları kullanın. 
 
 ``` bash 
 git clone https://github.com/Wehhuu/Blocks
@@ -26,14 +51,14 @@ cd Blocks
 ## Linux Dağıtımlarında Kurulum
 
 Dizine gittikten sonra içerideki Makefile'ı kullanarak istediğiniz şekilde indirme yapabilirsiniz.
+Bu komut ile programı derleyip `/bin` konumuna taşımış olursunuz.
 ``` bash 
 make install
 ```
-Bu komut ile programı derleyip `/bin` konumuna taşımış olursunuz.
+Eğer programı `/bin` konumuna değil de şu anki dizine koymak isterseniz bu komutu çalıştırabilirsiniz:
 ``` bash 
 make build
 ```
-Eğer programı `/bin` konumuna değil de şu anki dizine koymak isterseniz bu komutu çalıştırabilirsiniz.
 
 ## Android Üstünde Termux ile Kurulum
 Dizine gittikten sonra projeyi derleyebilirsiniz.
@@ -42,16 +67,33 @@ make build
 ```
 **⚠️ Not: Termux kullanıyorsanız `make install` komutunu kullanamazsınız. Bunun yerine `make build` ile bulunduğunuz dizinde derleme yapabilirsiniz.**
 
-# 2 - Kaldırma
+## Kaldırma
 Platform farketmeksizin:
 ``` bash
 make uninstall 
 ```
 kodunun kullanarak projeyi hem `/bin` adresinden hem de bulunduğunuz konumdan silebilirsiniz.
 
+
+# Nasıl Oynanır?
+
+Kontroller için varsayılan olarak `A` ve `D` tuşları önerilir. Oyundan çıkmak için `Q` harfine basabilirsiniz. (Oyundan çıkarken büyük harf küçük harf varsayılan olarak farkediyor. İsterseniz bunu da değiştirebilirsiniz fakat yanlışlıkla çıkılmayı engellemek adına önerilmez.)
+
+Eğer varsayılan kontrolleri beğenmediyseniz bunları [modifiye edebilirsiniz](#kontrol-değiştirme).
+
+
 # Modifikasyon ve İleri Okuma
+**⚠️ Önemli not: Eğer `main.c` dosyasında herhangi bir değişiklik yaptıysanız projeyi tekrar derlemeniz gerekmektedir. Aşağıda bazı derleme yöntemleri için kılavuzlar bulunmaktadır.** 
+
+**Normal derleme: Bunun için `make build` veya `make install` seçeneklerini kullanabilirsiniz. Farklarını görmek için [buraya](#linux-dağıtımlarında-kurulum) bakabilirsiniz.**
+
+**Debugging uyumlu derleme: Eğer GDB tarzı bir debugger kullanmak istiyorsanız bunun için `make debug-mode` özelliğini kullanabilirsiniz. Böylece bulunduğunuz dizinde debugging destekli bir derleme yapmış olursunuz.**
+
+## Kontrol Değiştirme
+Varsayılan tuş atamalarını kod üstünden değiştirmek için `main.c` dosyasındaki `DIRECTIONS` macrosunu değiştirebilirsiniz. Çıkma tuşunu değiştirmek için de `QUIT_KEY` macrosunu değiştirebilirsiniz.  
+
 ## Şekil tanımlama:
-`(bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X])`
+Bütün şekiller `bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X]` değişkeni içinde tutulur.
 
 Açıklama:
 Her bir şekil iki boyutlu birer `bool`'dur. `layouts` değişkeni üç boyutlu 
