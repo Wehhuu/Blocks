@@ -1,5 +1,6 @@
 // Tamamen CLI tabanlı oyun.
 #include <termios.h>// Terminali raw moda alacağım.
+#include <time.h>// Sırf rastgelelik için şimdilik.
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>// Non-blocking input için ayar yapacağım.
@@ -13,6 +14,7 @@
 void process_start(void);
 void process_frame(void);
 void render(void);
+void render_ui_content(void);
 void* take_input(void* ptr);//!
 void set_terminal(void);//!
 void reset_terminal(void);//!
@@ -87,6 +89,7 @@ bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
 {    {1, 1, 1}  ,  {0, 0, 0} }*/
 
 };
+unsigned int score = 0;
 #pragma endregion Variables
 
 #pragma region User Prototypes
@@ -116,7 +119,9 @@ int main(int argc, char** argv)//char* argv[] derim normalde ama böyle olsun bu
     while (should_update)
     {   
         process_frame();//* İlk önce girdiye göre verileri güncelleyelim.
-        printf("Anlık girdi: %i\nKarşılık gelen tuş: %c\n\n", input, input);
+
+        render_ui_content();//* Ekranın üstüne gelmesini istediğimden ilk önce UI'ı çizdireceğim.
+
         render();//* Güncellenmiş verileri kullanarak render işlemini yapalım.
 
         if(!should_update)break;//? Eğer oyundan oyun normal şekilde bittiyse ekranı temizleme.
@@ -147,7 +152,7 @@ int main(int argc, char** argv)//char* argv[] derim normalde ama böyle olsun bu
 /// bloğun adresini tutan toplamda iki adet işaretçiyi barındıran bir değer döndürür.
 block_part create_block(void)
 {
-    int selected_layout = rand() % TOTAL_LAYOUTS;
+    int selected_layout = rand() * time(0) % TOTAL_LAYOUTS;
     bool is_main_assigned = false;
 
     //?: Bu değişkenin main işaretçisi sabit bir değer alırken, next işaretçisi başka bir
@@ -262,7 +267,7 @@ void clear(void)
                 block_part storage;
                 storage.main = NULL;
 
-                // Bloğun merkezi daha aşağıda kalıyorsa.
+                //* Bloğun merkezi daha aşağıda kalıyorsa.
                 if (blocks[i][pos_in_row].main > &blocks[i][pos_in_row])
                 {
                     // Merkez adres orijinali ile aynı kaldıkça ve şu anki adres ile başlangıç konumu arasında en az bir satır oldukça merkezden yukarı çıkmaya çalış.
@@ -278,7 +283,7 @@ void clear(void)
                     }
 
                     // Şimdi az önceye geri dönüp kalan blokları silebiliriz.
-                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main->main; diver++)// Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
+                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++)// Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
                     {
                         row++;
                         diver->main = NULL;
@@ -286,52 +291,75 @@ void clear(void)
                     }                        
                 }
 
-                // Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz. 
-                // Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan 
-                // erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
+                //* Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz. 
+                //* Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan 
+                //* erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
                 else if (blocks[i][pos_in_row].main == &blocks[i][pos_in_row])
                 {
+                    // Bütün blok aynı satırda mı?
                     bool same_row = true;
 
-                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == blocks[i][pos_in_row].main && diver->next != NULL; diver = diver->next)
+                    // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mu?
+                    for (block_part *diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == blocks[i][pos_in_row].main; diver = diver->next)
                     {
-                        if (same_row && diver - &blocks[i][pos_in_row] < GRID_SIZE_X)// Aynı satırdalarsa farkları satır uzunluğundan küçük olmak zorunda.
+                        if (same_row && abs(diver - &blocks[i][pos_in_row]) <= GRID_SIZE_X)// Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
                         {
                             same_row = true;
                         }
-                        else
+                        else if (same_row)// Bu satırda olmayan ilk bloğu arıyorsam bu şekilde kendimi sağlama almalıyım ki başka bir blok varsa bile ilgilenmeyeyim.
                         {
                             same_row = false;
-                            storage.main = storage.main == NULL ? diver : storage.main;// Aradığımız şey bu satırda olmayan ilk blok. Ve bu tabii ki bu kondisyonun olduğu satırda aranır.
+                            storage.main = diver;// Aradığımız şey bloğun merkez hücrenin olduğu satırdan başka satırda bulunan ilk parçası.
                         }
                     }
                     
+                    //? Bütün blok aynı satırda.
                     if (same_row)
                     {
-                        for (block_part *diver = &blocks[i][pos_in_row]; diver->main == blocks[i][pos_in_row].main && diver->next != NULL; diver = diver->next)
+                        block_part old_block;
+                        old_block.main = blocks[i][pos_in_row].main;
+
+                        // Tüm bloğu sil.
+                        for (block_part *diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
                         {
                             row++;
                             diver->next = NULL;
                             diver->main = NULL;
                         }
                     }
+
+                    //? Bloğun üstü başka satırda.
                     else
                     {
-                        for (block_part *diver = storage.main; diver->main == blocks[i][pos_in_row].main && diver != NULL; diver = diver->next)
+                        // O satırda olmayan ilk bloğu yeni merkez yap ve silinecek satırda olmayan bütün bloklar için merkezi blok değerini de güncelle.
+                        for (block_part *diver = storage.main; diver != NULL; diver = diver->next)
                         {
                             diver->main = storage.main;
                         }
-
-                        for (block_part *diver = &blocks[i][pos_in_row]; diver != storage.main; diver = diver->next)
+                        
+                        block_part tmp;
+                        tmp.next = blocks[i][pos_in_row].next;
+                        // Eski merkezden başlayıp yeni merkeze kadar o bloğun tüm üyelerini temizle.
+                        for (block_part *diver = &blocks[i][pos_in_row]; diver != storage.main; diver = tmp.next)
                         {
+                            tmp.next = diver->next;
                             row++;
                             diver->next = NULL;
                             diver->main = NULL;
                         }
                     }
                 }
-
+                score += row * row;
                 pos_in_row += row;
+            }
+
+            //! Kontrol edin.
+            block_part *eraser = &blocks[i][0];
+            while (eraser != &blocks[i][GRID_SIZE_X])
+            {
+                eraser->main = NULL;
+                eraser->next = NULL;
+                eraser++;
             }
         }
     }
@@ -550,7 +578,6 @@ void process_frame(void)
 
         apply_gravity();
 
-        //TODO: Uygun satırları temizle.
         clear();  
     }
 }
@@ -582,6 +609,18 @@ void render(void)
     printf("\n");
 }
 
+/// @brief Oyuncunun skorunu vs.sini ekrana yazmak için metod.
+void render_ui_content()
+{
+    printf("-------------Debug Window-------------\n");
+    printf("Anlık girdi: %i\nKarşılık gelen tuş: %c\n", input, input);
+    printf("--------------------------------------\n\n");
+    
+    printf("\tPuan: %i", score);
+
+
+    printf("\n");//! Ne yazdırırsan yazdır ne kadar yazarsan yaz her zaman işin bitince alt satıra geç ki oyun çizilirken yanlışlık olmasın.
+}
 #pragma endregion Game Logic
 
 
