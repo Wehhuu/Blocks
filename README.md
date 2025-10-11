@@ -14,7 +14,8 @@
 - ✅ Girdi sistemi
 - ✅ Görüntü işleme
 - ✅ Makefile
-- 🚧 Satır temizleme (`clear` fonksiyonu, şu haliyle beklenmedik davranışlarda bulunuyor)
+- ✅ Satır temizleme (Bir takım eksiklikler halen mevcut, ileride düzeltilecek.)
+- ✅ Rastgelelik eklendi (Zaman tabanlı)
 - 🚧 Skor sistemi ve harici kayıt dosyası entegrasyonu
 - 🚧 Ana ekran (?)
 - 🚧 Kaybetme ekranı (?)
@@ -35,11 +36,13 @@
     * [Şekil Tanımlama](#şekil-tanımlama)
     * 🚧 Bu kısmın devamı gelecektir. 🚧
 
+4. [Lisans](#lisans)
+
 
 # Kurulum / Kaldırma
 
 ## Kurulum 
-Projeyi kurmak için `git`, `make` ve `gcc` programları varsayılan olarak kullanılmaktadır. Eğer `gcc` kullanmak istemiyorsanız ya da `make` kullanmak istemiyorsanız bunu kesinlikle yapabilirsiniz, sadece `Makefile` dosyasında derleme için zorunlu olan flaglare (`BUILD_FLAGS`) bakın ve manuel derlemede bunları kullanın. 
+Projeyi kurmak için `git`, `make` ve `gcc` programları varsayılan olarak kullanılmaktadır. Eğer `gcc` kullanmak istemiyorsanız ya da `make` kullanmak istemiyorsanız bunu kesinlikle yapabilirsiniz, sadece [Makefile](./Makefile) dosyasında derleme için zorunlu olan flaglare (`BUILD_FLAGS`) bakın ve manuel derlemede bunları kullanın. 
 
 ``` bash 
 git clone https://github.com/Wehhuu/Blocks
@@ -66,6 +69,7 @@ Dizine gittikten sonra projeyi derleyebilirsiniz.
 make build
 ```
 **⚠️ Not: Termux kullanıyorsanız `make install` komutunu kullanamazsınız. Bunun yerine `make build` ile bulunduğunuz dizinde derleme yapabilirsiniz.**
+
 
 ## Kaldırma
 Platform farketmeksizin:
@@ -124,3 +128,6 @@ bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
 ```                               
 ---
 
+# Lisans
+
+Bu proje, [MPL 2.0](./LICENSE) altında lisanslanmıştır.
