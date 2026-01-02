@@ -1,33 +1,49 @@
 CC := gcc
-SOURCE := main.c
-TARGET_NAME := terminal-game
-DEBUG_FLAGS := -g
-BUILD_FLAGS := -pthread
-RENAME_FLAG := -o
-BUILD_DIR := ./build
+CCFLAGS := 
+LDFLAGS := -lpthread
+SRC ?= main.c
+OUT ?= terminal-game
+
+TARGET_DIR ?= build
 BINDIR := /usr/local/bin
 
+MODE ?= default
+DBG := -g -Wall
+OPT := -O3
 
-all: help
+ifeq ($(MODE), debug)
+	CCFLAGS += DBG
+else ifeq ($(MODE), release)
+	CCFLAGS += OPT
+endif
 
-install: $(SOURCE)
-	$(CC) $(BUILD_FLAGS) $(RENAME_FLAG) $(TARGET_NAME) $(SOURCE)
-	sudo mv $(TARGET_NAME) $(BINDIR)/$(TARGET_NAME)
+build:
+	$(CC) $(SRC) -o $(OUT) $(CCFLAGS) $(LDFLAGS)
 
-build: $(SOURCE)
-	$(CC) $(BUILD_FLAGS) $(RENAME_FLAG) $(TARGET_NAME) $(SOURCE)
+	@if [ "$(MODE)" = "default" ]; then \
+		mkdir -p $(TARGET_DIR); \
+		mv -f $(OUT) $(TARGET_DIR)/$(OUT); \
+	fi
 
-debug-mode: $(SOURCE)
-	$(CC) $(BUILD_FLAGS) $(DEBUG_FLAGS) $(RENAME_FLAG) $(TARGET_NAME) $(SOURCE)
+uninstall:
+	sudo rm -f $(BINDIR)/$(OUT)
+	sudo rm -f $(OUT)
 
-uninstall: 
-	sudo rm -f $(BINDIR)/$(TARGET_NAME)
-	sudo rm -f $(TARGET_NAME)
+clean: 
+	sudo rm -f $(BINDIR)/$(OUT)
+
+	@printf "Warning: This action removes the whole $(TARGET_DIR) folder! Are you sure? (y/n)\n"
+	@read answer; \
+
+	@if [ "$$answer" = "y"]; then \
+		sudo rm -rf $(TARGET_DIR); \
+	else \
+		printf "Action cancelled.\n"; \
+	fi
 
 help:
-	@echo "install: compiles source code and copies it to $(BINDIR)" 
-	@echo "build: compiles source code."
-	@echo "debug: compiles source code with debug flags."
-	@echo "uninstall: uninstalls program from $(BINDIR) and current directories."
+	@printf "help: prints this message.\n"
+	@printf "build: compiles source code.\n"
+	@printf "uninstall: uninstalls program from device.\n"
 
 .PHONY: help clean install build debug-mode uninstall
