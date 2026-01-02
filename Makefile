@@ -20,22 +20,20 @@ endif
 build:
 	$(CC) $(SRC) -o $(OUT) $(CCFLAGS) $(LDFLAGS)
 
-	@if [ "$(MODE)" = "default" ]; then \
+	@if [ "$(MODE)" = "release" ]; then \
+		sudo mv -f $(OUT) $(BINDIR)/$(OUT); \
+	else \
 		mkdir -p $(TARGET_DIR); \
 		mv -f $(OUT) $(TARGET_DIR)/$(OUT); \
 	fi
 
-uninstall:
-	sudo rm -f $(BINDIR)/$(OUT)
-	sudo rm -f $(OUT)
 
 clean: 
 	sudo rm -f $(BINDIR)/$(OUT)
 
 	@printf "Warning: This action removes the whole $(TARGET_DIR) folder! Are you sure? (y/n)\n"
 	@read answer; \
-
-	@if [ "$$answer" = "y"]; then \
+	if [ "$$answer" = "y" ]; then \
 		sudo rm -rf $(TARGET_DIR); \
 	else \
 		printf "Action cancelled.\n"; \

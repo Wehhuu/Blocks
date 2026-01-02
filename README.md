@@ -13,8 +13,8 @@
 - ✅ Yerçekimi
 - ✅ Girdi sistemi
 - ✅ Görüntü işleme
-- ✅ Makefile
-- ✅ Satır temizleme (Bir takım eksiklikler halen mevcut, ileride düzeltilecek.)
+- ✅ Makefile (Makefile eklemesi yapıldı)
+- ✅ Satır temizleme (Bir takım eksiklikler halen mevcut, ileride düzeltilecek)
 - ✅ Rastgelelik eklendi (Zaman tabanlı)
 - 🚧 Skor sistemi ve harici kayıt dosyası entegrasyonu
 - 🚧 Ana ekran (?)
@@ -32,6 +32,7 @@
 2. [Nasıl Oynanır?](#nasıl-oynanır)
 
 3. [Modifikasyon ve İleri Okuma](#modifikasyon-ve-i̇leri-okuma)
+    * [Derleme](#derleme)
     * [Kontrol Değiştirme](#kontrol-değiştirme)
     * [Şekil Tanımlama](#şekil-tanımlama)
     * 🚧 Bu kısmın devamı gelecektir. 🚧
@@ -56,27 +57,30 @@ cd Blocks
 Dizine gittikten sonra içerideki Makefile'ı kullanarak istediğiniz şekilde indirme yapabilirsiniz.
 Bu komut ile programı derleyip `/bin` konumuna taşımış olursunuz.
 ``` bash 
-make install
+make build MODE=release
 ```
-Eğer programı `/bin` konumuna değil de şu anki dizine koymak isterseniz bu komutu çalıştırabilirsiniz:
+Eğer programı `/bin` konumuna değil de bulunduğunuz dizinde bir `builds` klasörüne koymak isterseniz bu komutu çalıştırabilirsiniz:
 ``` bash 
 make build
 ```
+Kurulumla ilgili detaylı açıklamaları [burada](#derleme) bulabilirsiniz.
 
 ## Android Üstünde Termux ile Kurulum
 Dizine gittikten sonra projeyi derleyebilirsiniz.
 ``` bash 
 make build
 ```
-**⚠️ Not: Termux kullanıyorsanız `make install` komutunu kullanamazsınız. Bunun yerine `make build` ile bulunduğunuz dizinde derleme yapabilirsiniz.**
+**⚠️ Not: Termux kullanıyorsanız programı `make build MODE=release` komutu ile kuramazsınız. Bunun yerine `make build MODE=debug` ile bulunduğunuz dizinde derleme yapabilirsiniz.**
 
 
 ## Kaldırma
 Platform farketmeksizin:
 ``` bash
-make uninstall 
+make clean 
 ```
-kodunun kullanarak projeyi hem `/bin` adresinden hem de bulunduğunuz konumdan silebilirsiniz.
+kodunun kullanarak projeyi hem `/bin` adresinden hem de bulunduğunuz dizinden silebilirsiniz.
+
+**Not: programı bulunduğunuz dizinden silmek için size sorulduğunda `y` diyin.**
 
 
 # Nasıl Oynanır?
@@ -89,9 +93,14 @@ Eğer varsayılan kontrolleri beğenmediyseniz bunları [modifiye edebilirsiniz]
 # Modifikasyon ve İleri Okuma
 **⚠️ Önemli not: Eğer `main.c` dosyasında herhangi bir değişiklik yaptıysanız projeyi tekrar derlemeniz gerekmektedir. Aşağıda bazı derleme yöntemleri için kılavuzlar bulunmaktadır.** 
 
-**Normal derleme: Bunun için `make build` veya `make install` seçeneklerini kullanabilirsiniz. Farklarını görmek için [buraya](#linux-dağıtımlarında-kurulum) bakabilirsiniz.**
 
-**Debugging uyumlu derleme: Eğer GDB tarzı bir debugger kullanmak istiyorsanız bunun için `make debug-mode` özelliğini kullanabilirsiniz. Böylece bulunduğunuz dizinde debugging destekli bir derleme yapmış olursunuz.**
+## Derleme
+
+**Normal derleme: Bunun için `make build` seçeneğini kullanabilirsiniz.**
+
+**Debugging uyumlu derleme: Eğer GDB tarzı bir debugger kullanmak istiyorsanız bunun için `make build MODE=debug` özelliğini kullanabilirsiniz. Böylece bulunduğunuz dizinde debugging destekli bir derleme yapmış olursunuz.**
+
+**Eğer bir debugger kullanmayacaksanız `make build MODE=release` ile hem programı optimize edebilirsiniz (varsayılan olarak `gcc` derleyicisinde `-O3` ile derleme yapar) hem de `bin` klasörüne kopyalanır.**
 
 ## Kontrol Değiştirme
 Varsayılan tuş atamalarını kod üstünden değiştirmek için `main.c` dosyasındaki `DIRECTIONS` macrosunu değiştirebilirsiniz. Çıkma tuşunu değiştirmek için de `QUIT_KEY` macrosunu değiştirebilirsiniz.  
