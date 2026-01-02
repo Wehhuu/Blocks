@@ -12,9 +12,9 @@ DBG := -g -Wall
 OPT := -O3
 
 ifeq ($(MODE), debug)
-	CCFLAGS += DBG
+	CCFLAGS += $(DBG)
 else ifeq ($(MODE), release)
-	CCFLAGS += OPT
+	CCFLAGS += $(OPT)
 endif
 
 build:
