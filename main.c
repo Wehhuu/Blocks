@@ -51,11 +51,12 @@ struct termios original;
 #pragma endregion Macros
 
 #pragma region Variables
-const unsigned int delta_time = 4000000 / 60; // İki ardışık kare arası zaman. 1 saniyeye bölümü FPS'i verir.
-const char block_skin[4] = "⬜";
-const char wall_skin[4] = "⬜";
+const unsigned int delta_time = 4000000 / 60; // İki ardışık kare arası mikrosaniye. 1 saniyeye bölümü FPS'i verir.
 
-bool debug = true;
+const char* block_skin = "██";
+const char* wall_skin = "██";
+
+bool debug = false;
 
 /// @brief blok nesnesinin fizik etkileşimi ve renderı için gerekli struct.
 typedef struct block_part
@@ -157,7 +158,7 @@ int main(int argc, char** argv)
 /// bloğun adresini tutan toplamda iki adet işaretçiyi barındıran bir değer döndürür.
 block_part create_block(void)
 {
-    int selected_layout = rand() * time(0) % TOTAL_LAYOUTS;
+    int selected_layout = rand() * time(NULL) % TOTAL_LAYOUTS;
     bool is_main_assigned = false;
 
     //?: Bu değişkenin main işaretçisi sabit bir değer alırken, next işaretçisi başka bir
@@ -587,12 +588,9 @@ void process_frame(void)
 /// @brief Her bir karede terminal ekranına çizim yapacak metod.
 void render(void)
 {
-    for (int l = 0; l < GRID_SIZE_X + 4; l++)
+    for (int l = 0; l < GRID_SIZE_X + 3; l++)
     {
-        if (l == (GRID_SIZE_X + 4) / 2)
-            printf("");
-        else
-            printf("%s", wall_skin);
+        printf("%s", wall_skin);
     }
     printf("\n");
     for (int i = 0; i < GRID_SIZE_Y; i++)
@@ -644,8 +642,6 @@ void* take_input(void* ptr)
 
     while (should_update)
     {
-        int delta_squared = delta_time / 100;
-
         tmp = getchar();
         tcflush(STDIN_FILENO, TCIFLUSH); // Her okumadan sonra tty io buffer'ının okunmamış input kısmını tamamen sil. Böylece uzun ANSII kodlu yön tuşları falan basılırsa bile sadece bir kareliğine işlem görsünler, yolu tıkamasınlar.
 
@@ -654,7 +650,6 @@ void* take_input(void* ptr)
         usleep(delta_time);
     }
 
-    reset_terminal();
     return NULL;
 }
 
@@ -662,17 +657,20 @@ void* take_input(void* ptr)
 void set_terminal(void)
 {
     struct termios attr;
-    tcgetattr(0, &attr);
-    original = attr;
-    attr.c_lflag &= ~(ECHO | ICANON); // Terminal girdi modunu non-canonical yap.
-    tcsetattr(0, TCSANOW, &attr);
 
-    fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+    atexit(reset_terminal);
+
+    tcgetattr(STDIN_FILENO, &attr);
+    original = attr;
+    attr.c_lflag &= ~(ECHO | ICANON); // Terminal girdi modunu non-canonical yap./
+    tcsetattr(STDIN_FILENO, TCSANOW, &attr);
+
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
 }
 
 void reset_terminal(void)
 {
-    tcsetattr(0, TCSAFLUSH, &original);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &original);
 }
 
 #pragma endregion Abstractions

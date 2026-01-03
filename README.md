@@ -16,6 +16,8 @@
 - ✅ Makefile (Makefile eklemesi yapıldı)
 - ✅ Satır temizleme (Bir takım eksiklikler halen mevcut, ileride düzeltilecek)
 - ✅ Rastgelelik eklendi (Zaman tabanlı)
+- ✅ Blok hareketleri daha yumuşak hale getirildi ve girdi sistemi daha sağlam yapıldı.
+- 🚧 Blokların ve oyun alanının yapıtaşlarına istediğiniz karakteri atama. 
 - 🚧 Skor sistemi ve harici kayıt dosyası entegrasyonu
 - 🚧 Ana ekran (?)
 - 🚧 Kaybetme ekranı (?)
@@ -43,7 +45,7 @@
 # Kurulum / Kaldırma
 
 ## Kurulum 
-Projeyi kurmak için `git`, `make` ve `gcc` programları varsayılan olarak kullanılmaktadır. Eğer `gcc` kullanmak istemiyorsanız ya da `make` kullanmak istemiyorsanız bunu kesinlikle yapabilirsiniz, sadece [Makefile](./Makefile) dosyasında derleme için zorunlu olan flaglare (`BUILD_FLAGS`) bakın ve manuel derlemede bunları kullanın. 
+Projeyi kurmak için `git`, `make` ve `gcc` programları varsayılan olarak kullanılmaktadır. Eğer `gcc` kullanmak istemiyorsanız ya da `make` kullanmak istemiyorsanız bunu kesinlikle yapabilirsiniz, sadece [Makefile](./Makefile) dosyasında derleme için zorunlu olan flaglare (`LDFLAGS`) bakın ve manuel derlemede bunları kullanın. 
 
 ``` bash 
 git clone https://github.com/Wehhuu/Blocks
@@ -96,11 +98,11 @@ Eğer varsayılan kontrolleri beğenmediyseniz bunları [modifiye edebilirsiniz]
 
 ## Derleme
 
-**Normal derleme: Bunun için `make build` seçeneğini kullanabilirsiniz.**
+**Normal derleme:** Bunun için `make build` seçeneğini kullanabilirsiniz.**
 
-**Debugging uyumlu derleme: Eğer GDB tarzı bir debugger kullanmak istiyorsanız bunun için `make build MODE=debug` özelliğini kullanabilirsiniz. Böylece bulunduğunuz dizinde debugging destekli bir derleme yapmış olursunuz.**
+**Debugging uyumlu derleme:** Eğer GDB tarzı bir debugger kullanmak istiyorsanız bunun için `make build MODE=debug` özelliğini kullanabilirsiniz. Böylece bulunduğunuz dizinde debugging destekli bir derleme yapmış olursunuz.**
 
-**Eğer bir debugger kullanmayacaksanız `make build MODE=release` ile hem programı optimize edebilirsiniz (varsayılan olarak `gcc` derleyicisinde `-O3` ile derleme yapar) hem de `bin` klasörüne kopyalanır.**
+**Eğer bir debugger kullanmayacaksanız:** `make build MODE=release` ile hem programı optimize edebilirsiniz (varsayılan olarak `gcc` derleyicisinde `-O3` ile derleme yapar) hem de `bin` klasörüne kopyalayabilirsiniz.
 
 ## Kontrol Değiştirme
 Varsayılan tuş atamalarını kod üstünden değiştirmek için `main.c` dosyasındaki `DIRECTIONS` macrosunu değiştirebilirsiniz. Çıkma tuşunu değiştirmek için de `QUIT_KEY` macrosunu değiştirebilirsiniz.  

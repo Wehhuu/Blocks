@@ -4,7 +4,7 @@ LDFLAGS := -lpthread
 SRC ?= main.c
 OUT ?= terminal-game
 
-TARGET_DIR ?= build
+TARGET_DIR ?= builds
 BINDIR := /usr/local/bin
 
 MODE ?= default
@@ -22,9 +22,11 @@ build:
 
 	@if [ "$(MODE)" = "release" ]; then \
 		sudo mv -f $(OUT) $(BINDIR)/$(OUT); \
+		printf "sudo mv -f $(OUT) $(BINDIR)/$(OUT)\n"; \
 	else \
 		mkdir -p $(TARGET_DIR); \
 		mv -f $(OUT) $(TARGET_DIR)/$(OUT); \
+		printf "mkdir -p $(TARGET_DIR)\nmv -f $(OUT) $(TARGET_DIR)/$(OUT)"; \
 	fi
 
 
@@ -35,6 +37,7 @@ clean:
 	@read answer; \
 	if [ "$$answer" = "y" ]; then \
 		sudo rm -rf $(TARGET_DIR); \
+		printf "\n"; \
 	else \
 		printf "Action cancelled.\n"; \
 	fi
@@ -42,6 +45,6 @@ clean:
 help:
 	@printf "help: prints this message.\n"
 	@printf "build: compiles source code.\n"
-	@printf "uninstall: uninstalls program from device.\n"
+	@printf "clean: uninstalls program from bin (and current directory if you want).\n"
 
 .PHONY: help clean install build debug-mode uninstall
