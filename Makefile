@@ -26,7 +26,7 @@ build:
 	else \
 		mkdir -p $(TARGET_DIR); \
 		mv -f $(OUT) $(TARGET_DIR)/$(OUT); \
-		printf "mkdir -p $(TARGET_DIR)\nmv -f $(OUT) $(TARGET_DIR)/$(OUT)"; \
+		printf "mkdir -p $(TARGET_DIR)\nmv -f $(OUT) $(TARGET_DIR)/$(OUT)\n"; \
 	fi
 
 
