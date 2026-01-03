@@ -1,13 +1,13 @@
 // Tamamen CLI tabanlı oyun.
-#include <termios.h>// Terminali raw moda alacağım.
-#include <time.h>// Sırf rastgelelik için şimdilik.
-#include <stdlib.h>
 #include <ctype.h>
-#include <fcntl.h>// Non-blocking input için ayar yapacağım.
-#include <stdio.h>// Rendering ve input için zorunlu.
-#include <unistd.h>// Delta kare zamanı için beklerken usleep kullanacağım.
-#include <pthread.h>// Girdiyi başka çekirdekte alacağım. Böylece ana thread bloklanmadan girdi alabileceğim.
-#include <stdbool.h>// Oyun döngüsünü kontrol edecek temel değişkenler için kullanılacak.
+#include <fcntl.h>   // Non-blocking input için ayar yapacağım.
+#include <pthread.h> // Girdiyi başka çekirdekte alacağım. Böylece ana thread bloklanmadan girdi alabileceğim.
+#include <stdbool.h> // Oyun döngüsünü kontrol edecek temel değişkenler için kullanılacak.
+#include <stdio.h>   // Rendering ve input için zorunlu.
+#include <stdlib.h>
+#include <termios.h> // Terminali raw moda alacağım.
+#include <time.h>    // Sırf rastgelelik için şimdilik.
+#include <unistd.h>  // Delta kare zamanı için beklerken usleep kullanacağım.
 
 //! ünlem ile işaretlenmiş prototip veya metodlar motorun çalışması için kritik öneme sahiptir.
 #pragma region Engine Prototypes
@@ -15,9 +15,10 @@ void process_start(void);
 void process_frame(void);
 void render(void);
 void render_ui_content(void);
-void* take_input(void* ptr);//!
-void set_terminal(void);//!
-void reset_terminal(void);//!
+void render_debug(void);
+void* take_input(void* ptr); //!
+void set_terminal(void);     //!
+void reset_terminal(void);   //!
 #pragma endregion Engine Prototypes
 
 // Oyunun çalışmasını sağlayan temel döngüleri kontrol eden ve yapılandıran değişkenler.
@@ -32,61 +33,62 @@ int input = 0;
 struct termios original;
 #pragma endregion Engine Variables
 
-
 //? Delta kare ve ekran temizleme motoru da ilgilendirdiği için bu bölüme alındı.
 #pragma region Engine Definitions
-#define CLEAR_SCREEN printf("\e[1;1H\e[2J")// Ekranı temizler.
-#define DELTA_TIME 5000000/60// İki ardışık kare arası zaman. 1 saniyeye bölümü FPS'i verir.
+#define CLEAR_SCREEN printf("\e[1;1H\e[2J") // Ekranı temizler.
 #pragma endregion Engine Definitons
-
 
 //? Bu makrolar ihtiyaca göre düzenlenebilir, yeniden adlandırılabilir.
 #pragma region User Definitions
 #pragma region Macros
-#define DIRECTIONS "AD"// Sağ için 1, sol için 0
+#define DIRECTIONS "AD" // Sağ için 1, sol için 0
 #define TOTAL_LAYOUTS 5
 #define LAYOUT_SIZE_Y 2
 #define LAYOUT_SIZE_X 3
-#define QUIT_KEY 'Q'// q yerine Q seçmemin nedeni yanlışlıkla çıkılma ihtimalini azaltmaktır.
-#define GRID_SIZE_X 15// Oyun alanının x eksenindeki boyutu.
-#define GRID_SIZE_Y 30// Oyun alanının y eksenindeki boyutu.
+#define QUIT_KEY 'Q'   // q yerine Q seçmemin nedeni yanlışlıkla çıkılma ihtimalini azaltmaktır.
+#define GRID_SIZE_X 15 // Oyun alanının x eksenindeki boyutu.
+#define GRID_SIZE_Y 25 // Oyun alanının y eksenindeki boyutu.
 #pragma endregion Macros
 
-
 #pragma region Variables
+const unsigned int delta_time = 4000000 / 60; // İki ardışık kare arası zaman. 1 saniyeye bölümü FPS'i verir.
+const char block_skin[4] = "⬜";
+const char wall_skin[4] = "⬜";
+
+bool debug = true;
+
 /// @brief blok nesnesinin fizik etkileşimi ve renderı için gerekli struct.
 typedef struct block_part
 {
-    struct block_part *main;//* Bir bloğun merkezi her zaman bloğun en alt sol noktasında olmalıdır.
-    struct block_part *next;//* Her bir blok parçası kendinden sonraki bloğa işaret eder.
-}
-block_part;
+    struct block_part* main; //* Bir bloğun merkezi her zaman bloğun en alt sol noktasında olmalıdır.
+    struct block_part* next; //* Her bir blok parçası kendinden sonraki bloğa işaret eder.
+} block_part;
 
-//?: Blok parçalarının olduğu ızgara. Bu ızgaranın her bir hanesi, iki adet işaretçi tutacak.
-// Eğer işaretçileri boşsa, bu hanede blok veya blok parçası yok demektir. Fakat işaretçileri 
+// Blok parçalarının olduğu ızgara. Bu ızgaranın her bir hanesi, iki adet işaretçi tutacak.
+// Eğer işaretçileri boşsa, bu hanede blok veya blok parçası yok demektir. Fakat işaretçileri
 // doluysa, orada bir blok parçası var demektir.
 block_part blocks[GRID_SIZE_Y][GRID_SIZE_X];
 
-//?: Yeni bir blok için oyunun hazır olup olmadığına belirleyen değişken.
+// Yeni bir blok için oyunun hazır olup olmadığına belirleyen değişken.
 // Yeni bir blok her oluştuğunda, o blok bir zemine oturana kadar o bloğun
 // ızgaradaki adresini tutar. O blok zemine oturunca adreslerine NULL atanır.
 block_part current = {NULL, NULL};
 
-//?: Blok tipleri.
-bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] = 
-{ 
-//*  Şeklin üstü | Şeklin altı     
-{    {1, 1, 1}  ,  {0, 1, 1} },   //* İlk şekil:  ### (1 1 1)
-                                  //*              ## (0 1 1)
-{    {0, 1, 1}  ,  {0, 0, 1} },
+// Blok tipleri.
+bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
+    {
+        //*  Şeklin üstü | Şeklin altı
+        {{1, 1, 1}, {0, 1, 1}}, //* İlk şekil:  ### (1 1 1)
+                                //*              ## (0 1 1)
+        {{0, 1, 1}, {0, 0, 1}},
 
-{    {0, 0, 1}  ,  {1, 1, 1} },
+        {{0, 0, 1}, {1, 1, 1}},
 
-{    {1, 1, 0}  ,  {1, 1, 0} },
+        {{1, 1, 0}, {1, 1, 0}},
 
-{    {0, 1, 0}  ,  {1, 1, 0} }/*,
+        {{0, 1, 0}, {1, 1, 0}} /*,
 
-{    {1, 1, 1}  ,  {0, 0, 0} }*/
+ {    {1, 1, 1}  ,  {0, 0, 0} }*/
 
 };
 unsigned int score = 0;
@@ -97,49 +99,52 @@ block_part create_block(void);
 void apply_gravity(void);
 void clear(void);
 int process_input(void);
-bool check_cell(block_part *cell, int mode);
+bool check_cell(block_part* cell, int mode);
 void change_pos(int dir);
 #pragma endregion User Prototypes
 
 #pragma endregion User Definitions
 
-
 #pragma region Main
 /// @brief Ana döngü.
-int main(int argc, char** argv)//char* argv[] derim normalde ama böyle olsun bu sefer.
-{    
+int main(int argc, char** argv)
+{
     should_update = true;
-    
-    process_start();//* İlk kare işlenir. Bu karede girdi yoktur.
 
-    pthread_t input_thread;//? İnput için thread oluşturur.
-    pthread_create(&input_thread, NULL, take_input, NULL);//? İnput threadine işleyeceği void* verilir.
+    process_start(); //* İlk kare işlenir. Bu karede girdi yoktur.
 
-    //?: Temel oyun döngüsü.
+    pthread_t input_thread;                                //? İnput için thread oluşturur.
+    pthread_create(&input_thread, NULL, take_input, NULL); //? İnput threadine işleyeceği void* verilir.
+
+    //? Temel oyun döngüsü.
     while (should_update)
-    {   
-        process_frame();//* İlk önce girdiye göre verileri güncelleyelim.
+    {
+        process_frame(); //* İlk önce girdiye göre verileri güncelleyelim.
 
-        render_ui_content();//* Ekranın üstüne gelmesini istediğimden ilk önce UI'ı çizdireceğim.
+        if (debug)
+            render_debug(); //? Eğer debug modunda ise debug içeriğini çiz.
 
-        render();//* Güncellenmiş verileri kullanarak render işlemini yapalım.
+        render_ui_content(); //* Ekranın üstüne gelmesini istediğimden ilk önce UI'ı çizdireceğim.
 
-        if(!should_update)break;//? Eğer oyundan oyun normal şekilde bittiyse ekranı temizleme.
+        render(); //* Güncellenmiş verileri kullanarak render işlemini yapalım.
 
-        usleep(DELTA_TIME);//* Bekle.
-        
-        CLEAR_SCREEN;//* Ekranı temizle.
+        if (!should_update)
+            break; //? Eğer oyundan oyun normal şekilde bittiyse ekranı temizleme.
+
+        usleep(delta_time); //* Bekle.
+
+        CLEAR_SCREEN; //* Ekranı temizle.
 
         if (input == QUIT_KEY)
-        {   
+        {
             should_update = false;
             CLEAR_SCREEN;
             printf("Çıkılıyor...\n");
             break;
         }
     }
-    
-    pthread_join(input_thread, NULL);//? Threadi bekle.
+
+    pthread_join(input_thread, NULL); //? Threadi bekle.
     printf("\nProgram sona erdi.\n\n");
     return 0;
 }
@@ -147,7 +152,7 @@ int main(int argc, char** argv)//char* argv[] derim normalde ama böyle olsun bu
 
 #pragma region User Functions
 /// @brief Yeni bir blok oluşturur.
-/// @return Oluşturduğu bloğun merkezindeki blok parçasının bir kopyasını döndürür. 
+/// @return Oluşturduğu bloğun merkezindeki blok parçasının bir kopyasını döndürür.
 /// Döndürdüğü blok bir işaretçi değildir, merkez bloğun adresini ve merkez bloktan sonraki
 /// bloğun adresini tutan toplamda iki adet işaretçiyi barındıran bir değer döndürür.
 block_part create_block(void)
@@ -173,7 +178,7 @@ block_part create_block(void)
                 return cell;
             }
             else if (!is_main_assigned && layouts[selected_layout][i][j] == true)
-            {   
+            {
                 cell.main = &blocks[floors[0] + i][floors[1] + j];
                 blocks[floors[0] + i][floors[1] + j].main = cell.main;
                 cell.next = cell.main;
@@ -187,7 +192,7 @@ block_part create_block(void)
             }
         }
     }
-    
+
     return *(cell.main);
 }
 
@@ -197,11 +202,11 @@ void apply_gravity(void)
     {
         for (int x = 0; x < GRID_SIZE_X; x++)
         {
-            if (&blocks[y][x] != NULL && blocks[y][x].main == &blocks[y][x])//? Eğer bir bloğun parçası ise. 
+            if (&blocks[y][x] != NULL && blocks[y][x].main == &blocks[y][x]) //? Eğer bir bloğun parçası ise.
             {
                 if (check_cell(&blocks[y][x], 0))
                 {
-                    block_part *cell = &blocks[y][x];    
+                    block_part* cell = &blocks[y][x];
                     block_part next_holder;
                     next_holder.main = cell->main + GRID_SIZE_X;
 
@@ -224,10 +229,10 @@ void apply_gravity(void)
 
                     (cell + GRID_SIZE_X)->next = NULL;
                     (cell + GRID_SIZE_X)->main = next_holder.main;
-                    
+
                     cell->next = NULL;
                     cell->main = NULL;
-                    
+
                     if (&blocks[y][x] == current.main)
                     {
                         current.main += GRID_SIZE_X;
@@ -235,7 +240,6 @@ void apply_gravity(void)
                     }
                 }
             }
-            
         }
     }
 }
@@ -251,9 +255,9 @@ void clear(void)
             //?: Bir tane bile boş hane varsa bu satırı atla. Boş yere durmayalım.
             if (blocks[i][j].main == NULL || blocks[i][j].main == current.main)
             {
-                j = GRID_SIZE_X;//?: break yerine bunu kullandım bilerek. Zararı yok sonuçta.
+                j = GRID_SIZE_X; //?: break yerine bunu kullandım bilerek. Zararı yok sonuçta.
                 ready = false;
-            } 
+            }
         }
 
         if (ready)
@@ -266,12 +270,13 @@ void clear(void)
             {
                 block_part storage;
                 storage.main = NULL;
+                storage.next = NULL;
 
                 //* Bloğun merkezi daha aşağıda kalıyorsa.
                 if (blocks[i][pos_in_row].main > &blocks[i][pos_in_row])
                 {
                     // Merkez adres orijinali ile aynı kaldıkça ve şu anki adres ile başlangıç konumu arasında en az bir satır oldukça merkezden yukarı çıkmaya çalış.
-                    for (block_part *diver = blocks[i][pos_in_row].main; diver->next != NULL && diver->main == blocks[i][pos_in_row].main && (diver - &blocks[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next) 
+                    for (block_part* diver = blocks[i][pos_in_row].main; diver->next != NULL && diver->main == blocks[i][pos_in_row].main && (diver - &blocks[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next)
                     {
                         storage.main = diver;
                     }
@@ -283,16 +288,16 @@ void clear(void)
                     }
 
                     // Şimdi az önceye geri dönüp kalan blokları silebiliriz.
-                    for (block_part *diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++)// Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
+                    for (block_part* diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++) // Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
                     {
                         row++;
                         diver->main = NULL;
                         diver->next = NULL;
-                    }                        
+                    }
                 }
 
-                //* Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz. 
-                //* Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan 
+                //* Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz.
+                //* Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan
                 //* erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
                 else if (blocks[i][pos_in_row].main == &blocks[i][pos_in_row])
                 {
@@ -300,19 +305,19 @@ void clear(void)
                     bool same_row = true;
 
                     // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mu?
-                    for (block_part *diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == blocks[i][pos_in_row].main; diver = diver->next)
+                    for (block_part* diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == blocks[i][pos_in_row].main; diver = diver->next)
                     {
-                        if (same_row && abs(diver - &blocks[i][pos_in_row]) <= GRID_SIZE_X)// Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
+                        if (same_row && abs(diver - &blocks[i][pos_in_row]) <= GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
                         {
                             same_row = true;
                         }
-                        else if (same_row)// Bu satırda olmayan ilk bloğu arıyorsam bu şekilde kendimi sağlama almalıyım ki başka bir blok varsa bile ilgilenmeyeyim.
+                        else if (same_row) // Bu satırda olmayan ilk bloğu arıyorsam bu şekilde kendimi sağlama almalıyım ki başka bir blok varsa bile ilgilenmeyeyim.
                         {
                             same_row = false;
-                            storage.main = diver;// Aradığımız şey bloğun merkez hücrenin olduğu satırdan başka satırda bulunan ilk parçası.
+                            storage.main = diver; // Aradığımız şey bloğun merkez hücrenin olduğu satırdan başka satırda bulunan ilk parçası.
                         }
                     }
-                    
+
                     //? Bütün blok aynı satırda.
                     if (same_row)
                     {
@@ -320,7 +325,7 @@ void clear(void)
                         old_block.main = blocks[i][pos_in_row].main;
 
                         // Tüm bloğu sil.
-                        for (block_part *diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
+                        for (block_part* diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
                         {
                             row++;
                             diver->next = NULL;
@@ -332,15 +337,15 @@ void clear(void)
                     else
                     {
                         // O satırda olmayan ilk bloğu yeni merkez yap ve silinecek satırda olmayan bütün bloklar için merkezi blok değerini de güncelle.
-                        for (block_part *diver = storage.main; diver != NULL; diver = diver->next)
+                        for (block_part* diver = storage.main; diver != NULL; diver = diver->next)
                         {
                             diver->main = storage.main;
                         }
-                        
+
                         block_part tmp;
                         tmp.next = blocks[i][pos_in_row].next;
                         // Eski merkezden başlayıp yeni merkeze kadar o bloğun tüm üyelerini temizle.
-                        for (block_part *diver = &blocks[i][pos_in_row]; diver != storage.main; diver = tmp.next)
+                        for (block_part* diver = &blocks[i][pos_in_row]; diver != storage.main; diver = tmp.next)
                         {
                             tmp.next = diver->next;
                             row++;
@@ -354,7 +359,7 @@ void clear(void)
             }
 
             //! Kontrol edin.
-            block_part *eraser = &blocks[i][0];
+            block_part* eraser = &blocks[i][0];
             while (eraser != &blocks[i][GRID_SIZE_X])
             {
                 eraser->main = NULL;
@@ -363,7 +368,6 @@ void clear(void)
             }
         }
     }
-
 }
 int process_input(void)
 {
@@ -382,7 +386,7 @@ int process_input(void)
 /// @param cell Merkez hücrenin adresi.
 /// @param mode İstenen hareket modu. 0 düşey, -1 ve 1 de istenen yatay hareket için girilir.
 /// @return Verilen merkez bloğun istenen hareket yönünün mümkün olup olmadığını döndürür.
-bool check_cell(block_part *cell, int mode)
+bool check_cell(block_part* cell, int mode)
 {
     if ((&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell - GRID_SIZE_X) < sizeof(block_part))
     {
@@ -393,12 +397,12 @@ bool check_cell(block_part *cell, int mode)
         }
         return false;
     }
-    
+
     if (mode == 0)
     {
         for (int i = 0; cell->next != NULL && i < LAYOUT_SIZE_Y * LAYOUT_SIZE_X; cell = cell->next, i++)
         {
-            if ( (cell + GRID_SIZE_X)->main != NULL && (cell + GRID_SIZE_X)->main != cell->main)
+            if ((cell + GRID_SIZE_X)->main != NULL && (cell + GRID_SIZE_X)->main != cell->main)
             {
                 if (cell->main == current.main)
                 {
@@ -416,7 +420,7 @@ bool check_cell(block_part *cell, int mode)
         for (int i = 0; cell->next != NULL && i < LAYOUT_SIZE_Y * LAYOUT_SIZE_X; cell = cell->next, i++)
         {
             //? En sağda veya soldayken daha da gitmesine engel olalım.
-            if (mode < 0 ? (cell - &blocks[0][0]) % GRID_SIZE_X >= 1 : (cell - &blocks[0][0]) % GRID_SIZE_X < GRID_SIZE_X - 1)// abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
+            if (mode < 0 ? (cell - &blocks[0][0]) % GRID_SIZE_X >= 1 : (cell - &blocks[0][0]) % GRID_SIZE_X < GRID_SIZE_X - 1) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
             {
                 if ((cell + mode)->main != NULL && (cell + mode)->main != cell->main)
                 {
@@ -453,7 +457,7 @@ void change_pos(int dir)
         return;
     }
 
-    block_part *cell = current.main;
+    block_part* cell = current.main;
     block_part secondary_storage;
     block_part storage;
 
@@ -461,7 +465,7 @@ void change_pos(int dir)
     bool is_this_last_piece = false;
     current.main += dir;
     current.next += dir;
-    
+
     for (int i = 0; i <= LAYOUT_SIZE_Y * LAYOUT_SIZE_Y; i++)
     {
         if (dir == 1)
@@ -472,21 +476,21 @@ void change_pos(int dir)
 
             (cell + dir)->next = success ? storage.next + dir : cell->next + dir;
             (cell + dir)->main = current.main;
-         
+
             //? Şu anki hücre geçmiş bir adımın parçası mı?
             if (cell->main != current.main)
             {
                 cell->next = NULL;
                 cell->main = NULL;
             }
-            
+
             storage = secondary_storage;
-            
-            //? Depo edilen yerde değer var mı? 
+
+            //? Depo edilen yerde değer var mı?
             if (is_this_last_piece)
             {
                 cell = storage.main;
-                
+
                 (cell + dir)->next = NULL;
                 (cell + dir)->main = current.main;
 
@@ -501,7 +505,7 @@ void change_pos(int dir)
             else if (storage.next == NULL)
             {
                 //* Depolanan adres boşmuş, az önce değerini yazdığımız yerden devam, veri kaybı yok.
-                cell = (storage.main)->next - dir;//? dir çıkartmamızın sebebi az önce veri yazarken ileriye yönelik ekleme yapmış olmamızdı. O yüzden şimdi de çıkarıyorum.
+                cell = (storage.main)->next - dir; //? dir çıkartmamızın sebebi az önce veri yazarken ileriye yönelik ekleme yapmış olmamızdı. O yüzden şimdi de çıkarıyorum.
                 success = false;
             }
             else
@@ -510,7 +514,7 @@ void change_pos(int dir)
                 cell = storage.main;
                 success = true;
             }
-            
+
             //? Eğer veri depolama başarılı ise burası çalışmaz. Çünkü bunun çalışması için depolanan bloğun sondan sonra gelmesi lazım ki cell->next NULL olabilsin.
             if (cell->next == NULL)
             {
@@ -525,7 +529,6 @@ void change_pos(int dir)
 
                 break;
             }
-
         }
 
         if (dir == -1)
@@ -554,9 +557,8 @@ void change_pos(int dir)
 }
 #pragma endregion User Functions
 
-
 #pragma region Game Logic
-/// @brief Oyunun ilk karesini işle. Bu karede girdi kullanmayın. 
+/// @brief Oyunun ilk karesini işle. Bu karede girdi kullanmayın.
 void process_start(void)
 {
     current = create_block();
@@ -578,7 +580,7 @@ void process_frame(void)
 
         apply_gravity();
 
-        clear();  
+        clear();
     }
 }
 
@@ -588,47 +590,51 @@ void render(void)
     for (int l = 0; l < GRID_SIZE_X + 4; l++)
     {
         if (l == (GRID_SIZE_X + 4) / 2)
-        printf("**");
+            printf("");
         else
-        printf("||");
+            printf("%s", wall_skin);
     }
     printf("\n");
     for (int i = 0; i < GRID_SIZE_Y; i++)
     {
-        printf("|#| ");
+        printf("%s ", wall_skin);
         for (int j = 0; j < GRID_SIZE_X; j++)
         {
-            printf("%s", blocks[i][j].main != NULL ? "[]" : "  ");
+            printf("%s", blocks[i][j].main != NULL ? block_skin : "  ");
         }
-        printf(" |#|\n");
+        printf(" %s\n", wall_skin);
     }
-    for (int l = 0; l < GRID_SIZE_X + 4; l++)
+    for (int l = 0; l < GRID_SIZE_X + 3; l++)
     {
-        printf("||");
+        printf("%s", wall_skin);
     }
     printf("\n");
 }
 
 /// @brief Oyuncunun skorunu vs.sini ekrana yazmak için metod.
-void render_ui_content()
+void render_ui_content(void)
+{
+    printf("\tPuan: %i", score);
+
+    printf("\n"); //! Ne yazdırırsan yazdır ne kadar yazarsan yaz her zaman işin bitince alt satıra geç ki oyun çizilirken yanlışlık olmasın.
+}
+
+/// @brief Hata giderme amaçlı bilgilerin yazılacağı pencere.
+void render_debug(void)
 {
     printf("-------------Debug Window-------------\n");
     printf("Anlık girdi: %i\nKarşılık gelen tuş: %c\n", input, input);
-    printf("--------------------------------------\n\n");
-    
-    printf("\tPuan: %i", score);
+    printf("--------------------------------------\n");
 
-
-    printf("\n");//! Ne yazdırırsan yazdır ne kadar yazarsan yaz her zaman işin bitince alt satıra geç ki oyun çizilirken yanlışlık olmasın.
+    printf("\n");
 }
 #pragma endregion Game Logic
 
-
-// Bundan sonraki kısım oyunun çalışması için temel fonksiyonları sunar. 
+// Bundan sonraki kısım oyunun çalışması için temel fonksiyonları sunar.
 // Input ve input için gerekli olan terminal ayarları burada yapılır.
 #pragma region Abstractions
 
-/// @brief Kullanıcı girdisini dinler. Farklı bir threadde çalıştığı 
+/// @brief Kullanıcı girdisini dinler. Farklı bir threadde çalıştığı
 /// için ana oyun işlemlerini bozmaz. Input için gerekli terminal ayarlarını
 /// bu metod yönetir, bu metod dışında terminal ayarı yapmayın.
 void* take_input(void* ptr)
@@ -638,9 +644,14 @@ void* take_input(void* ptr)
 
     while (should_update)
     {
+        int delta_squared = delta_time / 100;
+
         tmp = getchar();
+        tcflush(STDIN_FILENO, TCIFLUSH); // Her okumadan sonra tty io buffer'ının okunmamış input kısmını tamamen sil. Böylece uzun ANSII kodlu yön tuşları falan basılırsa bile sadece bir kareliğine işlem görsünler, yolu tıkamasınlar.
+
         input = tmp == -1 ? 0 : tmp;
-        usleep(DELTA_TIME);
+
+        usleep(delta_time);
     }
 
     reset_terminal();
@@ -648,12 +659,12 @@ void* take_input(void* ptr)
 }
 
 /// @brief Terminali canonical moddan raw moda alır, non-blocking input ayarlarını yapar.
-void  set_terminal(void)
+void set_terminal(void)
 {
     struct termios attr;
     tcgetattr(0, &attr);
     original = attr;
-    attr.c_lflag &= ~(ECHO | ICANON);// Terminal girdi modunu non-canonical yap.
+    attr.c_lflag &= ~(ECHO | ICANON); // Terminal girdi modunu non-canonical yap.
     tcsetattr(0, TCSANOW, &attr);
 
     fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
