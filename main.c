@@ -42,7 +42,7 @@ struct termios original;
 #pragma region User Definitions
 #pragma region Macros
 #define DIRECTIONS "AD" // Sağ için 1, sol için 0
-#define TOTAL_LAYOUTS 5
+#define TOTAL_LAYOUTS 4
 #define LAYOUT_SIZE_Y 2
 #define LAYOUT_SIZE_X 3
 #define QUIT_KEY 'Q'   // q yerine Q seçmemin nedeni yanlışlıkla çıkılma ihtimalini azaltmaktır.
@@ -51,12 +51,13 @@ struct termios original;
 #pragma endregion Macros
 
 #pragma region Variables
-const unsigned int delta_time = 4000000 / 60; // İki ardışık kare arası mikrosaniye. 1 saniyeye bölümü FPS'i verir.
+const unsigned int DELTA_TIME = 4000000 / 60; // İki ardışık kare arası mikrosaniye. 1 saniyeye bölümü FPS'i verir.
 
-const char* block_skin = "██";
-const char* wall_skin = "██";
+char* block_skin = "██"; // ██
+char* wall_skin = "██";  // ██
 
-bool debug = false;
+// render_debug metodu çağırılsın mı?
+bool debug = true;
 
 /// @brief blok nesnesinin fizik etkileşimi ve renderı için gerekli struct.
 typedef struct block_part
@@ -68,7 +69,7 @@ typedef struct block_part
 // Blok parçalarının olduğu ızgara. Bu ızgaranın her bir hanesi, iki adet işaretçi tutacak.
 // Eğer işaretçileri boşsa, bu hanede blok veya blok parçası yok demektir. Fakat işaretçileri
 // doluysa, orada bir blok parçası var demektir.
-block_part blocks[GRID_SIZE_Y][GRID_SIZE_X];
+block_part grid[GRID_SIZE_Y][GRID_SIZE_X];
 
 // Yeni bir blok için oyunun hazır olup olmadığına belirleyen değişken.
 // Yeni bir blok her oluştuğunda, o blok bir zemine oturana kadar o bloğun
@@ -81,15 +82,14 @@ bool layouts[TOTAL_LAYOUTS][LAYOUT_SIZE_Y][LAYOUT_SIZE_X] =
         //*  Şeklin üstü | Şeklin altı
         {{1, 1, 1}, {0, 1, 1}}, //* İlk şekil:  ### (1 1 1)
                                 //*              ## (0 1 1)
-        {{0, 1, 1}, {0, 0, 1}},
+        {{0, 0, 1}, {0, 0, 1}},
 
         {{0, 0, 1}, {1, 1, 1}},
 
         {{1, 1, 0}, {1, 1, 0}},
 
-        {{0, 1, 0}, {1, 1, 0}} /*,
-
- {    {1, 1, 1}  ,  {0, 0, 0} }*/
+        /*{{0, 1, 0}, {1, 1, 0}},*/
+        /*{{0, 1, 1}, {0, 0, 1}},*/
 
 };
 unsigned int score = 0;
@@ -123,16 +123,20 @@ int main(int argc, char** argv)
         process_frame(); //* İlk önce girdiye göre verileri güncelleyelim.
 
         if (debug)
+        {
             render_debug(); //? Eğer debug modunda ise debug içeriğini çiz.
+        }
 
         render_ui_content(); //* Ekranın üstüne gelmesini istediğimden ilk önce UI'ı çizdireceğim.
 
         render(); //* Güncellenmiş verileri kullanarak render işlemini yapalım.
 
         if (!should_update)
+        {
             break; //? Eğer oyundan oyun normal şekilde bittiyse ekranı temizleme.
+        }
 
-        usleep(delta_time); //* Bekle.
+        usleep(DELTA_TIME); //* Bekle.
 
         CLEAR_SCREEN; //* Ekranı temizle.
 
@@ -146,7 +150,9 @@ int main(int argc, char** argv)
     }
 
     pthread_join(input_thread, NULL); //? Threadi bekle.
+
     printf("\nProgram sona erdi.\n\n");
+
     return 0;
 }
 #pragma endregion Main
@@ -165,31 +171,33 @@ block_part create_block(void)
     // kullanmamak için önce kendisine atanıyor, daha sonra next işaretçisine ondan sonraki
     // hücre atanıyor.
     block_part cell;
+
     int floors[2] = {1, (GRID_SIZE_X - 1) / 2 - LAYOUT_SIZE_X / 2};
 
     for (int i = LAYOUT_SIZE_Y - 1; i >= 0; i--)
     {
         for (int j = 0; j < LAYOUT_SIZE_X; j++)
         {
-            if (blocks[floors[0] + i][floors[1] + j].main != NULL)
+            if (grid[floors[0] + i][floors[1] + j].main != NULL)
             {
                 should_update = false;
                 cell.main = NULL;
                 cell.next = NULL;
+
                 return cell;
             }
             else if (!is_main_assigned && layouts[selected_layout][i][j] == true)
             {
-                cell.main = &blocks[floors[0] + i][floors[1] + j];
-                blocks[floors[0] + i][floors[1] + j].main = cell.main;
+                cell.main = &grid[floors[0] + i][floors[1] + j];
+                grid[floors[0] + i][floors[1] + j].main = cell.main;
                 cell.next = cell.main;
                 is_main_assigned = true;
             }
             else if (is_main_assigned && layouts[selected_layout][i][j] == true)
             {
-                blocks[floors[0] + i][floors[1] + j].main = cell.main;
-                cell.next->next = &blocks[floors[0] + i][floors[1] + j];
-                cell.next = &blocks[floors[0] + i][floors[1] + j];
+                grid[floors[0] + i][floors[1] + j].main = cell.main;
+                cell.next->next = &grid[floors[0] + i][floors[1] + j];
+                cell.next = &grid[floors[0] + i][floors[1] + j];
             }
         }
     }
@@ -203,11 +211,11 @@ void apply_gravity(void)
     {
         for (int x = 0; x < GRID_SIZE_X; x++)
         {
-            if (&blocks[y][x] != NULL && blocks[y][x].main == &blocks[y][x]) //? Eğer bir bloğun parçası ise.
+            if (grid[y][x].main != NULL && grid[y][x].main == &grid[y][x]) //? Eğer bir bloğun parçası ise.
             {
-                if (check_cell(&blocks[y][x], 0))
+                if (check_cell(&grid[y][x], 0))
                 {
-                    block_part* cell = &blocks[y][x];
+                    block_part* cell = &grid[y][x];
                     block_part next_holder;
                     next_holder.main = cell->main + GRID_SIZE_X;
 
@@ -234,7 +242,7 @@ void apply_gravity(void)
                     cell->next = NULL;
                     cell->main = NULL;
 
-                    if (&blocks[y][x] == current.main)
+                    if (&grid[y][x] == current.main)
                     {
                         current.main += GRID_SIZE_X;
                         current.next += GRID_SIZE_X;
@@ -254,7 +262,7 @@ void clear(void)
         for (int j = 0; j < GRID_SIZE_X; j++)
         {
             //?: Bir tane bile boş hane varsa bu satırı atla. Boş yere durmayalım.
-            if (blocks[i][j].main == NULL || blocks[i][j].main == current.main)
+            if (grid[i][j].main == NULL || grid[i][j].main == current.main)
             {
                 j = GRID_SIZE_X; //?: break yerine bunu kullandım bilerek. Zararı yok sonuçta.
                 ready = false;
@@ -274,10 +282,10 @@ void clear(void)
                 storage.next = NULL;
 
                 //* Bloğun merkezi daha aşağıda kalıyorsa.
-                if (blocks[i][pos_in_row].main > &blocks[i][pos_in_row])
+                if (grid[i][pos_in_row].main > &grid[i][pos_in_row])
                 {
                     // Merkez adres orijinali ile aynı kaldıkça ve şu anki adres ile başlangıç konumu arasında en az bir satır oldukça merkezden yukarı çıkmaya çalış.
-                    for (block_part* diver = blocks[i][pos_in_row].main; diver->next != NULL && diver->main == blocks[i][pos_in_row].main && (diver - &blocks[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next)
+                    for (block_part* diver = grid[i][pos_in_row].main; diver->next != NULL && diver->main == grid[i][pos_in_row].main && (diver - &grid[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next)
                     {
                         storage.main = diver;
                     }
@@ -289,7 +297,7 @@ void clear(void)
                     }
 
                     // Şimdi az önceye geri dönüp kalan blokları silebiliriz.
-                    for (block_part* diver = &blocks[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++) // Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
+                    for (block_part* diver = &grid[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++) // Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
                     {
                         row++;
                         diver->main = NULL;
@@ -300,15 +308,15 @@ void clear(void)
                 //* Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz.
                 //* Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan
                 //* erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
-                else if (blocks[i][pos_in_row].main == &blocks[i][pos_in_row])
+                else if (grid[i][pos_in_row].main == &grid[i][pos_in_row])
                 {
                     // Bütün blok aynı satırda mı?
                     bool same_row = true;
 
                     // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mu?
-                    for (block_part* diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == blocks[i][pos_in_row].main; diver = diver->next)
+                    for (block_part* diver = &grid[i][pos_in_row]; diver != NULL && diver->main == grid[i][pos_in_row].main; diver = diver->next)
                     {
-                        if (same_row && abs(diver - &blocks[i][pos_in_row]) <= GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
+                        if (same_row && abs(diver - &grid[i][pos_in_row]) <= GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
                         {
                             same_row = true;
                         }
@@ -323,10 +331,10 @@ void clear(void)
                     if (same_row)
                     {
                         block_part old_block;
-                        old_block.main = blocks[i][pos_in_row].main;
+                        old_block.main = grid[i][pos_in_row].main;
 
                         // Tüm bloğu sil.
-                        for (block_part* diver = &blocks[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
+                        for (block_part* diver = &grid[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
                         {
                             row++;
                             diver->next = NULL;
@@ -344,9 +352,9 @@ void clear(void)
                         }
 
                         block_part tmp;
-                        tmp.next = blocks[i][pos_in_row].next;
+                        tmp.next = grid[i][pos_in_row].next;
                         // Eski merkezden başlayıp yeni merkeze kadar o bloğun tüm üyelerini temizle.
-                        for (block_part* diver = &blocks[i][pos_in_row]; diver != storage.main; diver = tmp.next)
+                        for (block_part* diver = &grid[i][pos_in_row]; diver != storage.main; diver = tmp.next)
                         {
                             tmp.next = diver->next;
                             row++;
@@ -360,8 +368,8 @@ void clear(void)
             }
 
             //! Kontrol edin.
-            block_part* eraser = &blocks[i][0];
-            while (eraser != &blocks[i][GRID_SIZE_X])
+            block_part* eraser = &grid[i][0];
+            while (eraser != &grid[i][GRID_SIZE_X])
             {
                 eraser->main = NULL;
                 eraser->next = NULL;
@@ -389,13 +397,14 @@ int process_input(void)
 /// @return Verilen merkez bloğun istenen hareket yönünün mümkün olup olmadığını döndürür.
 bool check_cell(block_part* cell, int mode)
 {
-    if ((&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell - GRID_SIZE_X) < sizeof(block_part))
+    if ((&grid[GRID_SIZE_Y][GRID_SIZE_X] - cell - GRID_SIZE_X) < sizeof(block_part))
     {
         if (cell->main == current.main)
         {
             current.main = NULL;
             current.next = NULL;
         }
+
         return false;
     }
 
@@ -410,6 +419,7 @@ bool check_cell(block_part* cell, int mode)
                     current.main = NULL;
                     current.next = NULL;
                 }
+
                 return false;
             }
         }
@@ -421,7 +431,7 @@ bool check_cell(block_part* cell, int mode)
         for (int i = 0; cell->next != NULL && i < LAYOUT_SIZE_Y * LAYOUT_SIZE_X; cell = cell->next, i++)
         {
             //? En sağda veya soldayken daha da gitmesine engel olalım.
-            if (mode < 0 ? (cell - &blocks[0][0]) % GRID_SIZE_X >= 1 : (cell - &blocks[0][0]) % GRID_SIZE_X < GRID_SIZE_X - 1) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
+            if (mode < 0 ? (cell - &grid[0][0]) % GRID_SIZE_X >= 1 : (cell - &grid[0][0]) % GRID_SIZE_X < GRID_SIZE_X - 1) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
             {
                 if ((cell + mode)->main != NULL && (cell + mode)->main != cell->main)
                 {
@@ -442,6 +452,7 @@ bool check_cell(block_part* cell, int mode)
         current.main = NULL;
         current.next = NULL;
     }
+
     return false;
 }
 
@@ -453,7 +464,7 @@ void change_pos(int dir)
     {
         return;
     }
-    if (!check_cell(current.main, dir))
+    else if (!check_cell(current.main, dir))
     {
         return;
     }
@@ -464,6 +475,7 @@ void change_pos(int dir)
 
     bool success = false;
     bool is_this_last_piece = false;
+
     current.main += dir;
     current.next += dir;
 
@@ -473,6 +485,7 @@ void change_pos(int dir)
         {
             secondary_storage.main = (cell + dir);
             secondary_storage.next = (cell + dir)->next;
+
             is_this_last_piece = secondary_storage.next == NULL && (cell + dir)->main == current.main - dir ? true : false;
 
             (cell + dir)->next = success ? storage.next + dir : cell->next + dir;
@@ -592,20 +605,26 @@ void render(void)
     {
         printf("%s", wall_skin);
     }
+
     printf("\n");
+
     for (int i = 0; i < GRID_SIZE_Y; i++)
     {
         printf("%s ", wall_skin);
+
         for (int j = 0; j < GRID_SIZE_X; j++)
         {
-            printf("%s", blocks[i][j].main != NULL ? block_skin : "  ");
+            printf("%s", grid[i][j].main != NULL ? block_skin : "  ");
         }
+
         printf(" %s\n", wall_skin);
     }
+
     for (int l = 0; l < GRID_SIZE_X + 3; l++)
     {
         printf("%s", wall_skin);
     }
+
     printf("\n");
 }
 
@@ -647,7 +666,7 @@ void* take_input(void* ptr)
 
         input = tmp == -1 ? 0 : tmp;
 
-        usleep(delta_time);
+        usleep(DELTA_TIME);
     }
 
     return NULL;
