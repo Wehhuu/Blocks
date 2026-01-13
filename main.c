@@ -324,7 +324,7 @@ void clear(void)
                     // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mı?
                     for (block_part* diver = &grid[i][x_pos]; diver != NULL && diver->main == grid[i][x_pos].main; diver = diver->next)
                     {
-                        if (abs(diver - &grid[i][x_pos]) < GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük olmak zorunda.
+                        if (labs(diver - &grid[i][x_pos]) < GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük olmak zorunda.
                         {
                             same_row = true;
                             storage.main = diver;
