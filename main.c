@@ -53,11 +53,12 @@ struct termios original;
 #pragma region Variables
 const unsigned int DELTA_TIME = 4000000 / 60; // İki ardışık kare arası mikrosaniye. 1 saniyeye bölümü FPS'i verir.
 
-char* block_skin = "██"; // ██
-char* wall_skin = "██";  // ██
+// Format: \e[48;2;{r};{g};{b}m
+char* block_skin = "\e[48;2;37;150;190m  \e[0m"; // ██ (44)
+char* wall_skin = "\e[48;2;32;100;215m  \e[0m";  // ██ (47)
 
 // render_debug metodu çağırılsın mı?
-bool debug = true;
+bool debug = false;
 
 /// @brief blok nesnesinin fizik etkileşimi ve renderı için gerekli struct.
 typedef struct block_part
@@ -205,6 +206,8 @@ block_part create_block(void)
     return *(cell.main);
 }
 
+/// @brief Bütün blokları en alttan başlayarak aşağı indirmeye çalışır.
+/// @param
 void apply_gravity(void)
 {
     for (int y = GRID_SIZE_Y - 1; y >= 0; y--)
@@ -253,51 +256,55 @@ void apply_gravity(void)
     }
 }
 
+/// @brief Bütün hücreleri dolu olan satırları aşağıdan yukarıya doğru temizler.
+/// @param
 void clear(void)
 {
-    for (int i = 0; i < GRID_SIZE_Y; i++)
+    for (int i = GRID_SIZE_Y; i > 0; i--)
     {
         //?: Satır kontrolünden sonra bu değişkene göre satır temizleme yapacağız.
         bool ready = true;
+
         for (int j = 0; j < GRID_SIZE_X; j++)
         {
             //?: Bir tane bile boş hane varsa bu satırı atla. Boş yere durmayalım.
             if (grid[i][j].main == NULL || grid[i][j].main == current.main)
             {
-                j = GRID_SIZE_X; //?: break yerine bunu kullandım bilerek. Zararı yok sonuçta.
                 ready = false;
+                break;
             }
         }
 
         if (ready)
         {
             // Bu aşamada sürekli satırlar arasında konum değiştireceğimiz için ne zaman satır sonuna geldiğimizi anlayamayız. Bu nedenle bu değişkeni kullanarak satır sonuna geldiğimizi anlayacağız.
-            int pos_in_row = 0;
+            int x_pos = 0;
             int row = 0;
 
-            while (pos_in_row < GRID_SIZE_X)
+            while (x_pos < GRID_SIZE_X)
             {
                 block_part storage;
                 storage.main = NULL;
                 storage.next = NULL;
 
                 //* Bloğun merkezi daha aşağıda kalıyorsa.
-                if (grid[i][pos_in_row].main > &grid[i][pos_in_row])
+                if (grid[i][x_pos].main > &grid[i][x_pos])
                 {
                     // Merkez adres orijinali ile aynı kaldıkça ve şu anki adres ile başlangıç konumu arasında en az bir satır oldukça merkezden yukarı çıkmaya çalış.
-                    for (block_part* diver = grid[i][pos_in_row].main; diver->next != NULL && diver->main == grid[i][pos_in_row].main && (diver - &grid[i][pos_in_row]) >= GRID_SIZE_X; diver = diver->next)
+                    for (block_part* diver = grid[i][x_pos].main; diver->next != NULL && diver->main == grid[i][x_pos].main && (diver - &grid[i][x_pos]) >= GRID_SIZE_X; diver = diver->next)
                     {
+                        // Üst satırlarda kalan ilk parça.
                         storage.main = diver;
                     }
 
-                    // Şu anda, hedef satırdan önceki son bloğu biliyoruz. Tek yapmamız gereken o bloğun next değerini sıfırlamak.
+                    /// Şu anda, hedef satırdan önceki son bloğu biliyoruz. Tek yapmamız gereken o bloğun next değerini sıfırlamak.
                     if (storage.main != NULL)
                     {
                         (storage.main)->next = NULL;
                     }
 
                     // Şimdi az önceye geri dönüp kalan blokları silebiliriz.
-                    for (block_part* diver = &grid[i][pos_in_row]; diver->main == storage.main && diver != storage.main; diver++) // Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
+                    for (block_part* diver = &grid[i][x_pos]; diver->main == storage.main && diver != storage.main; diver++) // Eğer şu anki hücre az öncekinin parçasıysa onu silelim.
                     {
                         row++;
                         diver->main = NULL;
@@ -308,22 +315,24 @@ void clear(void)
                 //* Bloğun merkezi bu satırda. (Not: Her blok için sadece bir kere işlem yapıyoruz.
                 //* Ve sağdan sola gittiğimize göre eğer o bloğun merkezi o satırdaysa merkez, o bloktan
                 //* erişebileceğimiz ilk parça olmak zorunda. Bu zaten bu tasarım mimarisin ana faydalarından da biri.)
-                else if (grid[i][pos_in_row].main == &grid[i][pos_in_row])
+                if (grid[i][x_pos].main == &grid[i][x_pos])
                 {
                     // Bütün blok aynı satırda mı?
                     bool same_row = true;
 
-                    // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mu?
-                    for (block_part* diver = &grid[i][pos_in_row]; diver != NULL && diver->main == grid[i][pos_in_row].main; diver = diver->next)
+                    // Gidebildiğimiz kadar gidip en sonki bloğa ulaşalım. Bakalım aynı satırda mı?
+                    for (block_part* diver = &grid[i][x_pos]; diver != NULL && diver->main == grid[i][x_pos].main; diver = diver->next)
                     {
-                        if (same_row && abs(diver - &grid[i][pos_in_row]) <= GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük veya satır uzunluğuna eşit olmak zorunda.
+                        if (abs(diver - &grid[i][x_pos]) < GRID_SIZE_X) // Aynı satırdalarsa farkları satır uzunluğundan küçük olmak zorunda.
                         {
                             same_row = true;
+                            storage.main = diver;
                         }
-                        else if (same_row) // Bu satırda olmayan ilk bloğu arıyorsam bu şekilde kendimi sağlama almalıyım ki başka bir blok varsa bile ilgilenmeyeyim.
+                        else // Bu satırda olmayan ilk bloğu arıyorsam bu şekilde kendimi sağlama almalıyım ki başka bir blok varsa bile ilgilenmeyeyim.
                         {
                             same_row = false;
                             storage.main = diver; // Aradığımız şey bloğun merkez hücrenin olduğu satırdan başka satırda bulunan ilk parçası.
+                            break;
                         }
                     }
 
@@ -331,10 +340,13 @@ void clear(void)
                     if (same_row)
                     {
                         block_part old_block;
-                        old_block.main = grid[i][pos_in_row].main;
+                        block_part tmp;
+
+                        tmp.next = grid[i][x_pos].next;
+                        old_block.main = grid[i][x_pos].main;
 
                         // Tüm bloğu sil.
-                        for (block_part* diver = &grid[i][pos_in_row]; diver != NULL && diver->main == old_block.main; diver = diver->next)
+                        for (block_part* diver = &grid[i][x_pos]; diver != NULL && diver->main == old_block.main; diver = tmp.next, tmp.next = diver->next)
                         {
                             row++;
                             diver->next = NULL;
@@ -352,23 +364,25 @@ void clear(void)
                         }
 
                         block_part tmp;
-                        tmp.next = grid[i][pos_in_row].next;
+                        tmp.next = grid[i][x_pos].next;
+
                         // Eski merkezden başlayıp yeni merkeze kadar o bloğun tüm üyelerini temizle.
-                        for (block_part* diver = &grid[i][pos_in_row]; diver != storage.main; diver = tmp.next)
+                        for (block_part* diver = &grid[i][x_pos]; diver != storage.main; diver = tmp.next, tmp.next = diver->next)
                         {
-                            tmp.next = diver->next;
                             row++;
                             diver->next = NULL;
                             diver->main = NULL;
                         }
                     }
                 }
+
                 score += row * row;
-                pos_in_row += row;
+                x_pos += row;
             }
 
             //! Kontrol edin.
             block_part* eraser = &grid[i][0];
+
             while (eraser != &grid[i][GRID_SIZE_X])
             {
                 eraser->main = NULL;
@@ -378,6 +392,9 @@ void clear(void)
         }
     }
 }
+
+/// @brief O karedeki girdiyi işleyerek bir yön döndürür.
+/// @return Alınan girdiyi kabul edilen girdi ile kıyaslayarak uygun değeri döndürür. (-1, 0, 1)
 int process_input(void)
 {
     if (toupper(input) == DIRECTIONS[0])
@@ -426,12 +443,16 @@ bool check_cell(block_part* cell, int mode)
 
         return true;
     }
+
     else if (abs(mode) == 1)
     {
         for (int i = 0; cell->next != NULL && i < LAYOUT_SIZE_Y * LAYOUT_SIZE_X; cell = cell->next, i++)
         {
             //? En sağda veya soldayken daha da gitmesine engel olalım.
-            if (mode < 0 ? (cell - &grid[0][0]) % GRID_SIZE_X >= 1 : (cell - &grid[0][0]) % GRID_SIZE_X < GRID_SIZE_X - 1) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
+            if (
+                mode < 0
+                    ? ((cell - &grid[0][0]) % GRID_SIZE_X >= 1)
+                    : ((&grid[GRID_SIZE_Y][GRID_SIZE_X] - cell) % GRID_SIZE_X > 1)) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
             {
                 if ((cell + mode)->main != NULL && (cell + mode)->main != cell->main)
                 {
@@ -479,16 +500,23 @@ void change_pos(int dir)
     current.main += dir;
     current.next += dir;
 
-    for (int i = 0; i <= LAYOUT_SIZE_Y * LAYOUT_SIZE_Y; i++)
+    for (int i = 0; i <= LAYOUT_SIZE_X * LAYOUT_SIZE_Y; i++)
     {
         if (dir == 1)
         {
             secondary_storage.main = (cell + dir);
             secondary_storage.next = (cell + dir)->next;
 
-            is_this_last_piece = secondary_storage.next == NULL && (cell + dir)->main == current.main - dir ? true : false;
+            is_this_last_piece =
+                (secondary_storage.next == NULL && (cell + dir)->main == current.main - (dir))
+                    ? true
+                    : false;
 
-            (cell + dir)->next = success ? storage.next + dir : cell->next + dir;
+            (cell + dir)->next =
+                success
+                    ? storage.next + dir
+                    : cell->next + dir;
+
             (cell + dir)->main = current.main;
 
             //? Şu anki hücre geçmiş bir adımın parçası mı?
