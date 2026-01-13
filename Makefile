@@ -2,7 +2,7 @@ CC := gcc
 CCFLAGS := 
 LDFLAGS := -lpthread
 SRC ?= main.c
-OUT ?= terminal-game
+OUT ?= blocks
 
 TARGET_DIR ?= builds
 BINDIR := /usr/local/bin
