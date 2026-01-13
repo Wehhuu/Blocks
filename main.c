@@ -53,7 +53,7 @@ struct termios original;
 #pragma region Variables
 const unsigned int DELTA_TIME = 4000000 / 60; // İki ardışık kare arası mikrosaniye. 1 saniyeye bölümü FPS'i verir.
 
-// Format: \e[48;2;{r};{g};{b}m
+// Format: \e[48;2;{r};{g};{b}m || \e[44;nm  (n {40 - 47} kümesinin bir elemanıdır.]
 char* block_skin = "\e[48;2;37;150;190m  \e[0m"; // ██ (44)
 char* wall_skin = "\e[48;2;32;100;215m  \e[0m";  // ██ (47)
 
@@ -112,6 +112,7 @@ void change_pos(int dir);
 int main(int argc, char** argv)
 {
     should_update = true;
+    srand(time(NULL)); // Rastgelelik için tek seferlik seed ayarlaması yapar.
 
     process_start(); //* İlk kare işlenir. Bu karede girdi yoktur.
 
@@ -165,7 +166,7 @@ int main(int argc, char** argv)
 /// bloğun adresini tutan toplamda iki adet işaretçiyi barındıran bir değer döndürür.
 block_part create_block(void)
 {
-    int selected_layout = rand() * time(NULL) % TOTAL_LAYOUTS;
+    int selected_layout = rand() % TOTAL_LAYOUTS;
     bool is_main_assigned = false;
 
     //?: Bu değişkenin main işaretçisi sabit bir değer alırken, next işaretçisi başka bir
