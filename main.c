@@ -261,12 +261,12 @@ void apply_gravity(void)
 /// @param
 void clear(void)
 {
-    for (int i = GRID_SIZE_Y; i > 0; i--)
+    for (int i = GRID_SIZE_Y - 1; i >= 0; i--)
     {
         //?: Satır kontrolünden sonra bu değişkene göre satır temizleme yapacağız.
         bool ready = true;
 
-        for (int j = 0; j < GRID_SIZE_X - 1; j++)
+        for (int j = 0; j < GRID_SIZE_X; j++)
         {
             //?: Bir tane bile boş hane varsa bu satırı atla. Boş yere durmayalım.
             if (grid[i][j].main == NULL || grid[i][j].main == current.main)
@@ -415,7 +415,7 @@ int process_input(void)
 /// @return Verilen merkez bloğun istenen hareket yönünün mümkün olup olmadığını döndürür.
 bool check_cell(block_part* cell, int mode)
 {
-    if ((&grid[GRID_SIZE_Y - 1][GRID_SIZE_X - 1] - cell - GRID_SIZE_X) < sizeof(block_part))
+    if ((&grid[GRID_SIZE_Y][GRID_SIZE_X] - cell - GRID_SIZE_X) < sizeof(block_part))
     {
         if (cell->main == current.main)
         {
