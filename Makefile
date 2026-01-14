@@ -21,8 +21,8 @@ build:
 	$(CC) $(SRC) -o $(OUT) $(CCFLAGS) $(LDFLAGS)
 
 	@if [ "$(MODE)" = "release" ]; then \
-		sudo mv -f $(OUT) $(BINDIR)/$(OUT); \
-		printf "sudo mv -f $(OUT) $(BINDIR)/$(OUT)\n"; \
+		mv -f $(OUT) $(BINDIR)/$(OUT); \
+		printf "mv -f $(OUT) $(BINDIR)/$(OUT)\n"; \
 	else \
 		mkdir -p $(TARGET_DIR); \
 		mv -f $(OUT) $(TARGET_DIR)/$(OUT); \
@@ -31,12 +31,12 @@ build:
 
 
 clean: 
-	sudo rm -f $(BINDIR)/$(OUT)
+	rm -f $(BINDIR)/$(OUT)
 
 	@printf "Warning: This action removes the whole $(TARGET_DIR) folder! Are you sure? (y/n)\n"
 	@read answer; \
 	if [ "$$answer" = "y" ]; then \
-		sudo rm -rf $(TARGET_DIR); \
+		rm -rf $(TARGET_DIR); \
 		printf "\n"; \
 	else \
 		printf "Action cancelled.\n"; \
