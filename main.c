@@ -415,7 +415,7 @@ int process_input(void)
 /// @return Verilen merkez bloğun istenen hareket yönünün mümkün olup olmadığını döndürür.
 bool check_cell(block_part* cell, int mode)
 {
-    if ((&grid[GRID_SIZE_Y][GRID_SIZE_X] - cell - GRID_SIZE_X) < sizeof(block_part))
+    if ((&grid[GRID_SIZE_Y - 1][GRID_SIZE_X - 1] - cell) < GRID_SIZE_X)
     {
         if (cell->main == current.main)
         {
@@ -453,7 +453,7 @@ bool check_cell(block_part* cell, int mode)
             if (
                 (mode < 0)
                     ? ((cell - &grid[0][0]) % GRID_SIZE_X >= 1)
-                    : ((&grid[GRID_SIZE_Y][GRID_SIZE_X] - cell) % GRID_SIZE_X > 1)) // abs(((cell - &blocks[0][0]) % GRID_SIZE_X) - GRID_SIZE_X) > 1)//!  || (&blocks[GRID_SIZE_Y][GRID_SIZE_X] - cell ) % GRID_SIZE_X != GRID_SIZE_X - 1 mutlak değerle yapamadığm zamanlardan falan kalma galiba. Bu not öyle iyi bir amaca hizmet ediyor değil yani.
+                    : ((&grid[GRID_SIZE_Y - 1][GRID_SIZE_X - 1] - cell) % GRID_SIZE_X >= 1))
             {
                 if ((cell + mode)->main != NULL && (cell + mode)->main != cell->main)
                 {
