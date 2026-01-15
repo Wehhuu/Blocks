@@ -21,7 +21,7 @@ build:
 	$(CC) $(SRC) -o $(OUT) $(CCFLAGS) $(LDFLAGS)
 
 	@if [ "$(MODE)" = "release" ]; then \
-		mv -f $(OUT) $(BINDIR)/$(OUT); \
+		sudo mv -f $(OUT) $(BINDIR)/$(OUT); \
 		printf "mv -f $(OUT) $(BINDIR)/$(OUT)\n"; \
 	else \
 		mkdir -p $(TARGET_DIR); \
